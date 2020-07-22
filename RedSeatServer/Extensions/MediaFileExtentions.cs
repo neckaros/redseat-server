@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using RedSeatServer.Services.Parser;
 
 namespace RedSeatServer.Extensions
@@ -80,6 +81,24 @@ namespace RedSeatServer.Extensions
             }
 
             return Quality.Unknown;
+        }
+        private static readonly RegexReplace NormalizeRegex = new RegexReplace(@"((?:\b|_)(?<!^)(a(?!$)|an|the|and|or|of)(?:\b|_))|\W|_",
+                                                                string.Empty,
+                                                                RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        private static readonly Regex PercentRegex = new Regex(@"(?<=\b\d+)%", RegexOptions.Compiled);
+        public static string CleanSeriesTitle(this string title)
+        {
+            long number = 0;
+
+            //If Title only contains numbers return it as is.
+            if (long.TryParse(title, out number))
+                return title;
+
+            // Replace `%` with `percent` to deal with the 3% case
+            title = PercentRegex.Replace(title, "percent");
+
+            return NormalizeRegex.Replace(title).ToLower().RemoveAccent();
         }
     }
 }

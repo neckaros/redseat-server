@@ -5,11 +5,20 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
 using RedSeatServer.Exceptions;
 using RedSeatServer.Extensions;
 using RedSeatServer.Services.Parser;
 
-public static class Parser
+namespace RedSeatServer.Services {
+    public interface IParserService
+    {
+        ParsedEpisodeInfo ParsePath(string path);
+        string ParseSeriesName(string title);
+        ParsedEpisodeInfo ParseTitle(string title);
+    }
+
+    public class ParserService : IParserService
     {
         //private static readonly Logger Logger = NzbDroneLogger.GetLogger(typeof(Parser));
 
@@ -329,12 +338,6 @@ public static class Parser
         //Regex to detect whether the title was reversed.
         private static readonly Regex ReversedTitleRegex = new Regex(@"(?:^|[-._ ])(p027|p0801|\d{2,3}E\d{2}S)[-._ ]", RegexOptions.Compiled);
 
-        private static readonly RegexReplace NormalizeRegex = new RegexReplace(@"((?:\b|_)(?<!^)(a(?!$)|an|the|and|or|of)(?:\b|_))|\W|_",
-                                                                string.Empty,
-                                                                RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-        private static readonly Regex PercentRegex = new Regex(@"(?<=\b\d+)%", RegexOptions.Compiled);
-
         private static readonly Regex FileExtensionRegex = new Regex(@"\.[a-z0-9]{2,4}$",
                                                                 RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
@@ -392,8 +395,14 @@ public static class Parser
         private static readonly Regex RequestInfoRegex = new Regex(@"^(?:\[.+?\])+", RegexOptions.Compiled);
 
         private static readonly string[] Numbers = new[] { "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine" };
+        private readonly ILogger<ParserService> _logger;
 
-        public static ParsedEpisodeInfo ParsePath(string path)
+        public ParserService(ILogger<ParserService> logger)
+        {
+            _logger = logger;
+        }
+
+        public ParsedEpisodeInfo ParsePath(string path)
         {
             var fileInfo = new FileInfo(path);
 
@@ -401,26 +410,26 @@ public static class Parser
 
             if (result == null)
             {
-                // Logger.Debug("Attempting to parse episode info using directory and file names. {0}", fileInfo.Directory.Name);
+                _logger.LogDebug("Attempting to parse episode info using directory and file names. {0}", fileInfo.Directory.Name);
                 result = ParseTitle(fileInfo.Directory.Name + " " + fileInfo.Name);
             }
 
             if (result == null)
             {
-                // Logger.Debug("Attempting to parse episode info using directory name. {0}", fileInfo.Directory.Name);
+                _logger.LogDebug("Attempting to parse episode info using directory name. {0}", fileInfo.Directory.Name);
                 result = ParseTitle(fileInfo.Directory.Name + fileInfo.Extension);
             }
 
             return result;
         }
 
-        public static ParsedEpisodeInfo ParseTitle(string title)
+        public ParsedEpisodeInfo ParseTitle(string title)
         {
             try
             {
                 if (!ValidateBeforeParsing(title)) return null;
 
-                // Logger.Debug("Parsing string '{0}'", title);
+                _logger.LogDebug("Parsing string '{0}'", title);
 
                 if (ReversedTitleRegex.IsMatch(title))
                 {
@@ -429,7 +438,7 @@ public static class Parser
 
                     title = new string(titleWithoutExtension) + title.Substring(titleWithoutExtension.Length);
 
-                    // Logger.Debug("Reversed name detected. Converted to '{0}'", title);
+                    _logger.LogDebug("Reversed name detected. Converted to '{0}'", title);
                 }
 
                 var releaseTitle = RemoveFileExtension(title);
@@ -440,7 +449,7 @@ public static class Parser
                 {
                     if (replace.TryReplace(ref releaseTitle))
                     {
-                        // Logger.Debug("Substituted with " + releaseTitle);
+                        _logger.LogDebug("Substituted with " + releaseTitle);
                     }
                 }
 
@@ -497,10 +506,10 @@ public static class Parser
                                 }
 
                                 result.Language = LanguageParser.ParseLanguage(releaseTitle);
-                                // Logger.Debug("Language parsed: {0}", result.Language);
+                                _logger.LogDebug("Language parsed: {0}", result.Language);
 
                                 result.Quality = QualityParser.ParseQuality(title);
-                                // Logger.Debug("Quality parsed: {0}", result.Quality);
+                                _logger.LogDebug("Quality parsed: {0}", result.Quality);
 
                                 result.ReleaseGroup = ParseReleaseGroup(releaseTitle);
 
@@ -510,12 +519,12 @@ public static class Parser
                                     result.ReleaseGroup = subGroup;
                                 }
 
-                                // Logger.Debug("Release Group parsed: {0}", result.ReleaseGroup);
+                                _logger.LogDebug("Release Group parsed: {0}", result.ReleaseGroup);
 
                                 result.ReleaseHash = GetReleaseHash(match);
                                 if (!result.ReleaseHash.IsNullOrWhiteSpace())
                                 {
-                                    // Logger.Debug("Release Hash parsed: {0}", result.ReleaseHash);
+                                    _logger.LogDebug("Release Hash parsed: {0}", result.ReleaseHash);
                                 }
 
                                 return result;
@@ -523,7 +532,7 @@ public static class Parser
                         }
                         catch (InvalidDateException ex)
                         {
-                            // Logger.Debug(ex, ex.Message);
+                            _logger.LogDebug(ex, ex.Message);
                             break;
                         }
                     }
@@ -531,41 +540,28 @@ public static class Parser
             }
             catch (Exception e)
             {
-               // if (!title.ToLower().Contains("password") && !title.ToLower().Contains("yenc"))
-                    // Logger.Error(e, "An error has occurred while trying to parse {0}", title);
+                if (!title.ToLower().Contains("password") && !title.ToLower().Contains("yenc"))
+                    _logger.LogError(e, "An error has occurred while trying to parse {0}", title);
             }
 
-            // Logger.Debug("Unable to parse {0}", title);
+            _logger.LogDebug("Unable to parse {0}", title);
             return null;
         }
 
-        public static string ParseSeriesName(string title)
+        public string ParseSeriesName(string title)
         {
-            // Logger.Debug("Parsing string '{0}'", title);
+            _logger.LogDebug("Parsing string '{0}'", title);
 
             var parseResult = ParseTitle(title);
 
             if (parseResult == null)
             {
-                return CleanSeriesTitle(title);
+                return title.CleanSeriesTitle();
             }
 
             return parseResult.SeriesTitle;
         }
 
-        public static string CleanSeriesTitle(this string title)
-        {
-            long number = 0;
-
-            //If Title only contains numbers return it as is.
-            if (long.TryParse(title, out number))
-                return title;
-
-            // Replace `%` with `percent` to deal with the 3% case
-            title = PercentRegex.Replace(title, "percent");
-
-            return NormalizeRegex.Replace(title).ToLower().RemoveAccent();
-        }
 
         public static string NormalizeEpisodeTitle(string title)
         {
@@ -684,7 +680,7 @@ public static class Parser
             return seriesTitleInfo;
         }
 
-        private static ParsedEpisodeInfo ParseMatchCollection(MatchCollection matchCollection, string releaseTitle)
+        private ParsedEpisodeInfo ParseMatchCollection(MatchCollection matchCollection, string releaseTitle)
         {
             var seriesName = matchCollection[0].Groups["title"].Value.Replace('.', ' ').Replace('_', ' ');
             seriesName = RequestInfoRegex.Replace(seriesName, "").Trim(' ');
@@ -877,16 +873,16 @@ public static class Parser
             result.SeriesTitle = seriesName;
             result.SeriesTitleInfo = GetSeriesTitleInfo(result.SeriesTitle);
 
-            // Logger.Debug("Episode Parsed. {0}", result);
+            _logger.LogDebug("Episode Parsed. {0}", result);
 
             return result;
         }
 
-        private static bool ValidateBeforeParsing(string title)
+        private bool ValidateBeforeParsing(string title)
         {
             if (title.ToLower().Contains("password") && title.ToLower().Contains("yenc"))
             {
-                // Logger.Debug("");
+                _logger.LogDebug("");
                 return false;
             }
 
@@ -899,7 +895,7 @@ public static class Parser
 
             if (RejectHashedReleasesRegexes.Any(v => v.IsMatch(titleWithoutExtension)))
             {
-                // Logger.Debug("Rejected Hashed Release Title: " + title);
+                _logger.LogDebug("Rejected Hashed Release Title: " + title);
                 return false;
             }
 
@@ -973,3 +969,4 @@ public static class Parser
             throw new FormatException(string.Format("{0} isn't a number", value));
         }
     }
+}

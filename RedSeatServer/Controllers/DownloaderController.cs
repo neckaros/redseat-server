@@ -5,8 +5,10 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using RedSeatServer.Models;
-using Microsoft.EntityFrameworkCore;
 using RedSeatServer.Downloaders;
+using Microsoft.AspNetCore.Http;
+using RedSeatServer.Services;
+using System.ComponentModel.DataAnnotations;
 
 namespace RedSeatServer.Controllers
 {
@@ -14,20 +16,15 @@ namespace RedSeatServer.Controllers
     [Route("[controller]")]
     public class DownloaderController : ControllerBase
     {
-        private static readonly string[] Summaries = new[]
-        {
-            "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-        };
-
         private readonly ILogger<DownloaderController> _logger;
         private readonly RedseatDbContext _context;
-        private readonly IDownloaderService _downloaderService;
+        private readonly IDownloadersService _downloadersService;
 
-        public DownloaderController(ILogger<DownloaderController> logger, RedseatDbContext context, IDownloaderService downloaderService)
+        public DownloaderController(ILogger<DownloaderController> logger, RedseatDbContext context, IDownloadersService downloadersService)
         {
             _logger = logger;
             _context = context;
-            _downloaderService = downloaderService;
+            _downloadersService = downloadersService;
         }
 
         [HttpGet]
@@ -52,7 +49,7 @@ namespace RedSeatServer.Controllers
         [HttpPost]
         public async Task<ActionResult<Download>> CreateDownloaderItem(Downloader downloader)
         {
-            await _downloaderService.ValidateDownloader(downloader);
+            await _downloadersService.ValidateDownloader(downloader);
             _context.Downloaders.Add(downloader);
             await _context.SaveChangesAsync();
 
@@ -60,6 +57,21 @@ namespace RedSeatServer.Controllers
                 nameof(GetDownloadById),
                 new { id = downloader.DownloaderId },
                 downloader);
+        }
+
+        [HttpPost("{id}/downloads/file")]
+        public async Task<ActionResult<Download>> AddDownloderDownload([FromForm][Required] IFormFile file, int id)
+        {
+            var downloader = await _downloadersService.GetById(id);
+            if (downloader == null) {
+                return NotFound($"Downloader with id {id} not found");
+            }
+            List<Download> downloads;
+            using (var stream = file.OpenReadStream()) {
+                downloads = await _downloadersService.getDownloaderEngine(downloader).AddDownloadFromFile(downloader, stream, name: file.FileName, size: file.Length).ToListAsync();
+            }
+            _logger.LogInformation($"Received download file: {file.FileName} ({file.Length})");
+            return Ok(downloads);
         }
     }
 }

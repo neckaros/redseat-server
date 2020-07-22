@@ -6,7 +6,7 @@ namespace RedSeatServer.Downloaders.AllDebrid
         public AllDebridLink() {}
         public string Link { get; set; } 
         public string Filename { get; set; } 
-        public int Size { get; set; } 
+        public long Size { get; set; } 
 
         public List<string> Files { get; set; } 
 

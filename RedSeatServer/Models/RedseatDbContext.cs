@@ -23,6 +23,8 @@ namespace RedSeatServer.Models
                 .Entity<Download>()
                 .Property(e => e.DownloadStatus)
                 .HasConversion<string>();
+            modelBuilder.Entity<Download>()
+                .HasIndex(b => b.DownloadStatus);
             modelBuilder
                 .Entity<Downloader>()
                 .Property(e => e.DownloaderType)

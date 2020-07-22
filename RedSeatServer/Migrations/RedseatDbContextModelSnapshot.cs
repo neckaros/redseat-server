@@ -26,18 +26,23 @@ namespace RedSeatServer.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("DownloaderId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int?>("DownloaderId1")
+                    b.Property<int?>("DownloaderId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<double>("Progress")
-                        .HasColumnType("REAL");
+                    b.Property<string>("ExternalId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("downloaded")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("size")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("DownloadId");
 
-                    b.HasIndex("DownloaderId1");
+                    b.HasIndex("DownloadStatus");
+
+                    b.HasIndex("DownloaderId");
 
                     b.ToTable("Downloads");
                 });
@@ -58,7 +63,7 @@ namespace RedSeatServer.Migrations
                     b.Property<string>("Path")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("token")
+                    b.Property<string>("Token")
                         .HasColumnType("TEXT");
 
                     b.HasKey("DownloaderId");
@@ -70,7 +75,7 @@ namespace RedSeatServer.Migrations
                 {
                     b.HasOne("RedSeatServer.Models.Downloader", "Downloader")
                         .WithMany("Downloads")
-                        .HasForeignKey("DownloaderId1");
+                        .HasForeignKey("DownloaderId");
                 });
 #pragma warning restore 612, 618
         }

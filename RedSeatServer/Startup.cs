@@ -43,8 +43,9 @@ namespace RedSeatServer
             services.AddHangfireServer();
 
             services.AddDbContext<RedseatDbContext>();
-            services.AddTransient<IDownloaderService, DownloaderService>();
+            services.AddScoped<IDownloadersService, DownloadersService>();
             services.AddTransient<IIoService, IoService>();
+            services.AddTransient<IParserService, ParserService>();
             services.AddControllers().AddJsonOptions(opts =>
             {
                 //opts.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());

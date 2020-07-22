@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using RedSeatServer.Models;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Http;
 
 namespace RedSeatServer.Controllers
 {
@@ -13,11 +13,6 @@ namespace RedSeatServer.Controllers
     [Route("[controller]")]
     public class DownloadController : ControllerBase
     {
-        private static readonly string[] Summaries = new[]
-        {
-            "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-        };
-
         private readonly ILogger<DownloadController> _logger;
         private readonly RedseatDbContext _context;
 
@@ -46,17 +41,17 @@ namespace RedSeatServer.Controllers
             return download;
         }
 
-        [HttpPost]
-        public async Task<ActionResult<Download>> CreateTodoItem(Download download)
-        {
-
-            _context.Downloads.Add(download);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(
-                nameof(GetDownloadById),
-                new { id = download.DownloadId },
-                download);
-        }
+        // [HttpPost]
+        // public async Task<ActionResult<Download>> CreateTodoItem([FromForm] IFormFile file)
+        // {
+        //     //_logger.LogInformation($"Received download file: {file.Name} ({file.Length})");
+        //     // _context.Downloads.Add(download);
+        //     // await _context.SaveChangesAsync();
+        //         return NotFound();
+        //     // return CreatedAtAction(
+        //     //     nameof(GetDownloadById),
+        //     //     new { id = download.DownloadId },
+        //     //     download);
+        // }
     }
 }
