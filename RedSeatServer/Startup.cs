@@ -16,9 +16,11 @@ using Hangfire;
 using Hangfire.Storage.SQLite;
 using RedSeatServer.Services;
 using RedSeatServer.Downloaders;
+using AutoMapper;
 
 namespace RedSeatServer
 {
+        
     public class Startup
     {
         public Startup(IConfiguration configuration)
@@ -31,6 +33,7 @@ namespace RedSeatServer
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            services.AddAutoMapper(typeof(Startup));
             services.AddHangfire(configuration => configuration
        .SetDataCompatibilityLevel(CompatibilityLevel.Version_170)
        .UseSimpleAssemblyNameTypeSerializer()

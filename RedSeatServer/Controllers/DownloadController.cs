@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using RedSeatServer.Models;
 using Microsoft.AspNetCore.Http;
+using AutoMapper;
 
 namespace RedSeatServer.Controllers
 {
@@ -15,11 +16,13 @@ namespace RedSeatServer.Controllers
     {
         private readonly ILogger<DownloadController> _logger;
         private readonly RedseatDbContext _context;
+        private readonly IMapper _mapper;
 
-        public DownloadController(ILogger<DownloadController> logger, RedseatDbContext context)
+        public DownloadController(ILogger<DownloadController> logger, RedseatDbContext context, IMapper mapper)
         {
             _logger = logger;
             _context = context;
+            _mapper = mapper;
         }
 
         [HttpGet]
@@ -29,7 +32,7 @@ namespace RedSeatServer.Controllers
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<Download>> GetDownloadById(int id)
+        public async Task<ActionResult<DownloaderDto>> GetDownloadById(int id)
         {
             var download = await _context.Downloads.FindAsync(id);
 
@@ -38,7 +41,7 @@ namespace RedSeatServer.Controllers
                 return NotFound();
             }
 
-            return download;
+            return _mapper.Map<DownloaderDto>(download);
         }
 
         // [HttpPost]

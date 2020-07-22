@@ -9,6 +9,7 @@ using RedSeatServer.Downloaders;
 using Microsoft.AspNetCore.Http;
 using RedSeatServer.Services;
 using System.ComponentModel.DataAnnotations;
+using AutoMapper;
 
 namespace RedSeatServer.Controllers
 {
@@ -19,12 +20,14 @@ namespace RedSeatServer.Controllers
         private readonly ILogger<DownloaderController> _logger;
         private readonly RedseatDbContext _context;
         private readonly IDownloadersService _downloadersService;
+        private readonly IMapper _mapper;
 
-        public DownloaderController(ILogger<DownloaderController> logger, RedseatDbContext context, IDownloadersService downloadersService)
+        public DownloaderController(ILogger<DownloaderController> logger, RedseatDbContext context, IDownloadersService downloadersService, IMapper mapper)
         {
             _logger = logger;
             _context = context;
             _downloadersService = downloadersService;
+            _mapper = mapper;
         }
 
         [HttpGet]
@@ -34,7 +37,7 @@ namespace RedSeatServer.Controllers
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<Downloader>> GetDownloadById(int id)
+        public async Task<ActionResult<DownloaderDto>> GetDownloadById(int id)
         {
             var downloader = await _context.Downloaders.FindAsync(id);
 
@@ -43,7 +46,7 @@ namespace RedSeatServer.Controllers
                 return NotFound();
             }
 
-            return downloader;
+            return _mapper.Map<DownloaderDto>(downloader);
         }
 
         [HttpPost]
@@ -68,10 +71,13 @@ namespace RedSeatServer.Controllers
             }
             List<Download> downloads;
             using (var stream = file.OpenReadStream()) {
-                downloads = await _downloadersService.getDownloaderEngine(downloader).AddDownloadFromFile(downloader, stream, name: file.FileName, size: file.Length).ToListAsync();
+                downloads = await _downloadersService
+                .getDownloaderEngine(downloader)
+                .AddDownloadFromFile(downloader, stream, name: file.FileName, size: file.Length)
+                .ToListAsync();
             }
             _logger.LogInformation($"Received download file: {file.FileName} ({file.Length})");
-            return Ok(downloads);
+            return Ok(_mapper.Map<List<DownloadDtoWithoutDownloader>>(downloads));
         }
     }
 }
