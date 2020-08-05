@@ -10,6 +10,8 @@ using Microsoft.AspNetCore.Http;
 using RedSeatServer.Services;
 using System.ComponentModel.DataAnnotations;
 using AutoMapper;
+using TvDbSharper;
+using Hangfire;
 
 namespace RedSeatServer.Controllers
 {
@@ -19,13 +21,17 @@ namespace RedSeatServer.Controllers
     {
         private readonly ILogger<DownloaderController> _logger;
         private readonly RedseatDbContext _context;
+        private readonly IParserService _parserService;
+        private readonly IBackgroundJobClient _backgroundJobs;
         private readonly IDownloadersService _downloadersService;
         private readonly IMapper _mapper;
 
-        public DownloaderController(ILogger<DownloaderController> logger, RedseatDbContext context, IDownloadersService downloadersService, IMapper mapper)
+        public DownloaderController(ILogger<DownloaderController> logger, RedseatDbContext context, IParserService parserService,  IBackgroundJobClient backgroundJobs, IDownloadersService downloadersService, IMapper mapper)
         {
             _logger = logger;
             _context = context;
+            _parserService = parserService;
+            _backgroundJobs = backgroundJobs;
             _downloadersService = downloadersService;
             _mapper = mapper;
         }
@@ -63,21 +69,34 @@ namespace RedSeatServer.Controllers
         }
 
         [HttpPost("{id}/downloads/file")]
-        public async Task<ActionResult<Download>> AddDownloderDownload([FromForm][Required] IFormFile file, int id)
+        public async Task<IEnumerable<DownloadDtoWithoutDownloader>> AddDownloderDownload([FromForm][Required] IFormFile file, int id, [FromForm] DownloadType type)
         {
             var downloader = await _downloadersService.GetById(id);
             if (downloader == null) {
-                return NotFound($"Downloader with id {id} not found");
+                //return NotFound($"Downloader with id {id} not found");
             }
-            List<Download> downloads;
+            List<Download> downloads = new List<Download>();
             using (var stream = file.OpenReadStream()) {
-                downloads = await _downloadersService
+                var downloadsFromEngine = _downloadersService
                 .getDownloaderEngine(downloader)
-                .AddDownloadFromFile(downloader, stream, name: file.FileName, size: file.Length)
-                .ToListAsync();
+                .AddDownloadFromFile(downloader, stream, name: file.FileName, size: file.Length, type);
+                await foreach (var downlaod in downloadsFromEngine)
+                {
+                    var downloadSaved = await _downloadersService.AddDownload(downlaod);
+                    downloads.Add(downloadSaved);
+                    foreach (var fileAdded in downloadSaved.Files)
+                    {
+                        _backgroundJobs.Enqueue<MonitorProgressService>((s) => s.ParseFile(fileAdded.fileId, true));
+                    }
+                    
+                }
+                
+            await _context.SaveChangesAsync();
             }
+            
             _logger.LogInformation($"Received download file: {file.FileName} ({file.Length})");
-            return Ok(_mapper.Map<List<DownloadDtoWithoutDownloader>>(downloads));
+            var downloadsDto = _mapper.Map<List<DownloadDtoWithoutDownloader>>(downloads);
+            return downloadsDto;
         }
     }
 }

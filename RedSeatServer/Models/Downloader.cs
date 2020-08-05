@@ -52,7 +52,7 @@ namespace RedSeatServer.Models
         [JsonConverter(typeof(JsonStringEnumConverter))]
         [Required]
         public DownloaderType DownloaderType { get; set; }
-        public String Name { get; set; }
+        public string Name { get; set; }
         public string Path {get; set;}
     }
 }

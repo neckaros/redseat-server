@@ -7,6 +7,10 @@ using Microsoft.Extensions.Logging;
 using RedSeatServer.Models;
 using Microsoft.AspNetCore.Http;
 using AutoMapper;
+using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
+using Microsoft.AspNetCore.Cors;
+using Open.Nat;
 
 namespace RedSeatServer.Controllers
 {
@@ -24,11 +28,13 @@ namespace RedSeatServer.Controllers
             _context = context;
             _mapper = mapper;
         }
-
+        [EnableCors("LocalAndServer")]
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Download>>>  Get()
+        public async Task<ActionResult<IEnumerable<DownloadDto>>>  Get()
         {
-            return await _context.Downloads.ToListAsync();
+            var downloads =  await _context.Downloads.Include("Files").ToListAsync();
+            
+            return _mapper.Map<List<DownloadDto>>(downloads);
         }
 
         [HttpGet("{id}")]
