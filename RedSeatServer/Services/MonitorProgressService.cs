@@ -42,7 +42,7 @@ namespace RedSeatServer.Services
         
         public async Task ParseFile(int fileId, bool force) {
             var file = await _downloadsService.GetFile(fileId);
-            if (file.Parsed && !force) {
+            if (file == null || (file.Parsed && !force)) {
                 return;
             }
             else if (file.Download.Type == DownloadType.Show) {

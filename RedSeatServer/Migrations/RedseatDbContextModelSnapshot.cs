@@ -35,6 +35,9 @@ namespace RedSeatServer.Migrations
                     b.Property<string>("ExternalId")
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("FilesAvailable")
+                        .HasColumnType("INTEGER");
+
                     b.Property<long>("Size")
                         .HasColumnType("INTEGER");
 
@@ -77,6 +80,9 @@ namespace RedSeatServer.Migrations
 
             modelBuilder.Entity("RedSeatServer.Models.Episode", b =>
                 {
+                    b.Property<int?>("ShowId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("Season")
                         .HasColumnType("INTEGER");
 
@@ -95,15 +101,10 @@ namespace RedSeatServer.Migrations
                     b.Property<string>("Overview")
                         .HasColumnType("TEXT");
 
-                    b.Property<int?>("ShowId")
-                        .HasColumnType("INTEGER");
-
                     b.Property<string>("Title")
                         .HasColumnType("TEXT");
 
-                    b.HasKey("Season", "Number");
-
-                    b.HasIndex("ShowId");
+                    b.HasKey("ShowId", "Season", "Number");
 
                     b.ToTable("Episodes");
                 });
@@ -116,7 +117,7 @@ namespace RedSeatServer.Migrations
                     b.Property<int?>("ShowId")
                         .HasColumnType("INTEGER");
 
-                    b.HasKey("Name");
+                    b.HasKey("Name", "ShowId");
 
                     b.HasIndex("ShowId");
 
@@ -136,6 +137,9 @@ namespace RedSeatServer.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<int?>("EpisodeSeason")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("EpisodeShowId")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
@@ -159,7 +163,7 @@ namespace RedSeatServer.Migrations
 
                     b.HasIndex("ShowId");
 
-                    b.HasIndex("EpisodeSeason", "EpisodeNumber");
+                    b.HasIndex("EpisodeShowId", "EpisodeSeason", "EpisodeNumber");
 
                     b.ToTable("Files");
                 });
@@ -257,14 +261,18 @@ namespace RedSeatServer.Migrations
                 {
                     b.HasOne("RedSeatServer.Models.Show", null)
                         .WithMany("Episodes")
-                        .HasForeignKey("ShowId");
+                        .HasForeignKey("ShowId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("RedSeatServer.Models.Genre", b =>
                 {
                     b.HasOne("RedSeatServer.Models.Show", null)
                         .WithMany("Genre")
-                        .HasForeignKey("ShowId");
+                        .HasForeignKey("ShowId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("RedSeatServer.Models.RFile", b =>
@@ -281,7 +289,7 @@ namespace RedSeatServer.Migrations
 
                     b.HasOne("RedSeatServer.Models.Episode", "Episode")
                         .WithMany()
-                        .HasForeignKey("EpisodeSeason", "EpisodeNumber");
+                        .HasForeignKey("EpisodeShowId", "EpisodeSeason", "EpisodeNumber");
                 });
 #pragma warning restore 612, 618
         }

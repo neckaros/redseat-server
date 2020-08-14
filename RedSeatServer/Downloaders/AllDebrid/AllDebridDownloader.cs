@@ -45,6 +45,8 @@ namespace RedSeatServer.Downloaders
             }
         }
 
+        
+
         public async ValueTask<DownloadProgress> GetDownload(Downloader downloader, object id)
         {
             if (!int.TryParse(id.ToString(), out var idParsed)) throw new ArgumentException("Id must be a int or parsable int for AllDebrid");
@@ -104,7 +106,8 @@ namespace RedSeatServer.Downloaders
                     Size = progress?.Size ?? file.Size,
                     DownloadStatus = file.Ready ? DownloadStatus.Downloaded : DownloadStatus.Downloading,
                     Downloaded = progress?.Downloaded ?? 0,
-                    Files = progress?.Files.ToList()
+                    Files = progress?.Files.ToList(),
+                    FilesAvailable = progress?.Files != null,
                 };
             }
             } else {

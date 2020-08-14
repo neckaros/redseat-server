@@ -75,6 +75,7 @@ namespace RedSeatServer.Migrations
                     Type = table.Column<string>(type: "TEXT", nullable: false),
                     DownloadStatus = table.Column<string>(type: "TEXT", nullable: false),
                     Size = table.Column<long>(type: "INTEGER", nullable: false),
+                    FilesAvailable = table.Column<bool>(type: "INTEGER", nullable: false),
                     Downloaded = table.Column<long>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
@@ -94,22 +95,22 @@ namespace RedSeatServer.Migrations
                 {
                     Number = table.Column<int>(type: "INTEGER", nullable: false),
                     Season = table.Column<int>(type: "INTEGER", nullable: false),
+                    ShowId = table.Column<int>(type: "INTEGER", nullable: false),
                     AbsoluteNumber = table.Column<int>(type: "INTEGER", nullable: false),
                     FirstAired = table.Column<long>(type: "INTEGER", nullable: false),
                     LastUpdated = table.Column<long>(type: "INTEGER", nullable: false),
                     Title = table.Column<string>(type: "TEXT", nullable: true),
-                    Overview = table.Column<string>(type: "TEXT", nullable: true),
-                    ShowId = table.Column<int>(type: "INTEGER", nullable: true)
+                    Overview = table.Column<string>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Episodes", x => new { x.Season, x.Number });
+                    table.PrimaryKey("PK_Episodes", x => new { x.ShowId, x.Season, x.Number });
                     table.ForeignKey(
                         name: "FK_Episodes_Shows_ShowId",
                         column: x => x.ShowId,
                         principalTable: "Shows",
                         principalColumn: "ShowId",
-                        onDelete: ReferentialAction.Restrict);
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -117,17 +118,17 @@ namespace RedSeatServer.Migrations
                 columns: table => new
                 {
                     Name = table.Column<string>(type: "TEXT", nullable: false),
-                    ShowId = table.Column<int>(type: "INTEGER", nullable: true)
+                    ShowId = table.Column<int>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Genres", x => x.Name);
+                    table.PrimaryKey("PK_Genres", x => new { x.Name, x.ShowId });
                     table.ForeignKey(
                         name: "FK_Genres_Shows_ShowId",
                         column: x => x.ShowId,
                         principalTable: "Shows",
                         principalColumn: "ShowId",
-                        onDelete: ReferentialAction.Restrict);
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -141,6 +142,7 @@ namespace RedSeatServer.Migrations
                     Name = table.Column<string>(type: "TEXT", nullable: true),
                     Size = table.Column<long>(type: "INTEGER", nullable: false),
                     ShowId = table.Column<int>(type: "INTEGER", nullable: true),
+                    EpisodeShowId = table.Column<int>(type: "INTEGER", nullable: true),
                     EpisodeSeason = table.Column<int>(type: "INTEGER", nullable: true),
                     EpisodeNumber = table.Column<int>(type: "INTEGER", nullable: true),
                     Parsed = table.Column<bool>(type: "INTEGER", nullable: false)
@@ -155,10 +157,10 @@ namespace RedSeatServer.Migrations
                         principalColumn: "DownloadId",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_Files_Episodes_EpisodeSeason_EpisodeNumber",
-                        columns: x => new { x.EpisodeSeason, x.EpisodeNumber },
+                        name: "FK_Files_Episodes_EpisodeShowId_EpisodeSeason_EpisodeNumber",
+                        columns: x => new { x.EpisodeShowId, x.EpisodeSeason, x.EpisodeNumber },
                         principalTable: "Episodes",
-                        principalColumns: new[] { "Season", "Number" },
+                        principalColumns: new[] { "ShowId", "Season", "Number" },
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_Files_Shows_ShowId",
@@ -179,19 +181,14 @@ namespace RedSeatServer.Migrations
                 column: "DownloadStatus");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Episodes_ShowId",
-                table: "Episodes",
-                column: "ShowId");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_Files_DownloadId",
                 table: "Files",
                 column: "DownloadId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Files_EpisodeSeason_EpisodeNumber",
+                name: "IX_Files_EpisodeShowId_EpisodeSeason_EpisodeNumber",
                 table: "Files",
-                columns: new[] { "EpisodeSeason", "EpisodeNumber" });
+                columns: new[] { "EpisodeShowId", "EpisodeSeason", "EpisodeNumber" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Files_ShowId",

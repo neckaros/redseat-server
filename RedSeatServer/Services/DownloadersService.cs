@@ -17,8 +17,11 @@ namespace RedSeatServer.Services
     public interface IDownloadersService
     {
         
+        Task<RFile> GetFileById(int id);
         Task<RsFileStream> GetFileStream(int fileId);
         IAsyncEnumerable<DownloadProgress> GetAllDownloads(Downloader downloader);
+        
+        ValueTask<DownloadProgress> GetDownload(Downloader downloader, string downloaderId);
         ValueTask<Downloader> GetById(int id);
         ValueTask<Download> AddDownload(Download download);
         IDownloaderEngine getDownloaderEngine(Downloader downloader);
@@ -52,6 +55,8 @@ namespace RedSeatServer.Services
         }
         public IAsyncEnumerable<DownloadProgress> GetAllDownloads(Downloader downloader) => getDownloaderEngine(downloader).GetAllDownloads(downloader);
 
+        public ValueTask<DownloadProgress> GetDownload(Downloader downloader, string downloaderId) => getDownloaderEngine(downloader).GetDownload(downloader, downloaderId);
+
         public Task ValidateDownloader(Downloader downloader)
         {
             if (downloader.Name == null)
@@ -64,6 +69,10 @@ namespace RedSeatServer.Services
         public ValueTask<Downloader> GetById(int id)
         {
             return _dbContext.Downloaders.FindAsync(id);
+        }
+        public Task<RFile> GetFileById(int id)
+        {
+            return _dbContext.Files.Include(nameof(RFile.Show)).Include(nameof(RFile.Episode)).FirstOrDefaultAsync(f => f.fileId == id);
         }
 
         public async Task<RsFileStream> GetFileStream(int fileId) {

@@ -21,6 +21,12 @@ namespace RedSeatServer.Models
         public Show Show {get;set;}
         public Episode Episode {get;set;}
         public bool Parsed  {get;set;}
+        
+        public override string ToString() {
+            if (Show != null) {
+                return $"{Show.Name} {Episode.Season}x{Episode.Number}";
+            } else return Name;
+        }
     }
 
       public class RFileDto {
@@ -29,6 +35,9 @@ namespace RedSeatServer.Models
         public string Name { get; set; }
         public long Size { get; set; }
         public string Path { get; set; }
+        public ShowLightDto Show {get;set;}
+        public Episode Episode {get;set;}
+        public bool Parsed  {get;set;}
     }
     
 }

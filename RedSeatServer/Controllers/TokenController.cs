@@ -58,7 +58,7 @@ namespace RedSeatServer.Controllers
 
         [EnableCors("LocalAndServer")]
         [HttpPost("{token}")]
-        public async Task<ActionResult<IEnumerable<String>>> addUpload(int file, string token, string name, string parent)
+        public async Task<ActionResult<IEnumerable<String>>> addUpload([FromForm] int[] file, string token, [FromForm]string parent)
         {
 
             var tokenRetreived = await _context.Tokens.FindAsync(token);
@@ -66,18 +66,20 @@ namespace RedSeatServer.Controllers
             {
                 return NotFound("token not found)");
             }
-
-            var fileRetreived = await _context.Files.FindAsync(file);
-            if (fileRetreived == null)
+            var listJobs = new List<string>();
+            foreach (var fileToUpload in file)
             {
-                return NotFound("file not found)");
+                var fileRetreived = await _context.Files.FindAsync(fileToUpload);
+                if (fileRetreived == null)
+                {
+                    return NotFound($"file {fileToUpload} not found)");
+                }
+                var id = _backgroundJobs.Enqueue<RsDriveService>((d) => d.upload(fileToUpload, tokenRetreived.Id, tokenRetreived.Key, parent));
             }
-
-
-            var id = _backgroundJobs.Enqueue<RsDriveService>((d) => d.upload(file, tokenRetreived.Id, tokenRetreived.Key, name, parent));
+           
             //await _rsDriveService.upload(file, tokenRetreived.Id, tokenRetreived.Key, name, parent);
 
-            return Ok(id);
+            return Ok(listJobs);
         }
 
 

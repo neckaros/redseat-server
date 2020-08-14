@@ -32,7 +32,7 @@ namespace RedSeatServer.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<DownloadDto>>>  Get()
         {
-            var downloads =  await _context.Downloads.Include("Files").ToListAsync();
+            var downloads =  await _context.Downloads.Include("Files").Include("Files.Show").Include("Files.Episode").ToListAsync();
             
             return _mapper.Map<List<DownloadDto>>(downloads);
         }

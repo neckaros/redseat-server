@@ -27,7 +27,7 @@ namespace RedSeatServer.Models
         {
             modelBuilder
                .Entity<Genre>()
-               .HasKey(nameof(Genre.Name));
+               .HasKey(nameof(Genre.Name), "ShowId");
 
                 modelBuilder
                .Entity<Token>()
@@ -35,7 +35,7 @@ namespace RedSeatServer.Models
 
             modelBuilder
                .Entity<Episode>()
-               .HasKey(nameof(Episode.Season), nameof(Episode.Number));
+               .HasKey("ShowId", nameof(Episode.Season), nameof(Episode.Number));
             modelBuilder
                .Entity<Episode>()
                 .Property(e => e.FirstAired)

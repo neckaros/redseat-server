@@ -19,6 +19,7 @@ using RedSeatServer.Extensions;
 using System.Net.Http.Headers;
 using RedSeatServer.Models;
 using System.Web;
+using Hangfire;
 
 namespace RedSeatServer.Services
 {
@@ -45,21 +46,22 @@ namespace RedSeatServer.Services
         public string TokenType { get; set; }
     }
 
-    public class DriveFileResult {
+    public class DriveFileResult
+    {
         [JsonPropertyName("kind")]
-        public string Kind { get; set; } 
+        public string Kind { get; set; }
 
         [JsonPropertyName("nextPageToken")]
-        public string NextPageToken { get; set; } 
+        public string NextPageToken { get; set; }
 
         [JsonPropertyName("incompleteSearch")]
-        public bool IncompleteSearch { get; set; } 
-        public DriveFile[] Files {get;set;}
+        public bool IncompleteSearch { get; set; }
+        public DriveFile[] Files { get; set; }
     }
 
     class MessageTokenHandler : DelegatingHandler
     {
-        
+
         private static JsonSerializerOptions jsonOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -70,7 +72,7 @@ namespace RedSeatServer.Services
 
         private ServiceToken _token;
 
-        public IRsDriveService driveService {get; set;}
+        public IRsDriveService driveService { get; set; }
         public MessageTokenHandler(string tokenId, string tokenKey)
         {
             InnerHandler = new HttpClientHandler();
@@ -86,8 +88,9 @@ namespace RedSeatServer.Services
             return await base.SendAsync(request, cancellationToken);
         }
 
-        
-        public async Task<ServiceToken> GetToken() {
+
+        public async Task<ServiceToken> GetToken()
+        {
             await maybeRefreshToken();
             return _token;
         }
@@ -101,29 +104,33 @@ namespace RedSeatServer.Services
         public async Task refreshToken()
         {
 
-            using(var client = new HttpClient()) {
-            client.DefaultRequestHeaders.Authorization 
-                         = new AuthenticationHeaderValue("Bearer", _tokenKey);
-            var request = await client.GetAsync($"http://localhost:3000/api/token?id={_tokenId}");
-            var result = await JsonSerializer.DeserializeAsync<TokenResult>(await request.Content.ReadAsStreamAsync(), jsonOptions);
-            _token = new ServiceToken() { 
-            accessToken = result.AccessToken,
-            expiresAt = DateTimeOffset.Now.AddSeconds(result.ExpiresIn)};
+            using (var client = new HttpClient())
+            {
+                client.DefaultRequestHeaders.Authorization
+                             = new AuthenticationHeaderValue("Bearer", _tokenKey);
+                var request = await client.GetAsync($"http://localhost:3000/api/token?id={_tokenId}");
+                var result = await JsonSerializer.DeserializeAsync<TokenResult>(await request.Content.ReadAsStreamAsync(), jsonOptions);
+                _token = new ServiceToken()
+                {
+                    accessToken = result.AccessToken,
+                    expiresAt = DateTimeOffset.Now.AddSeconds(result.ExpiresIn)
+                };
             }
         }
     }
 
-    public class DriveFile {
-        public string Id {get;set;}
-        public string Name {get;set;}
-        public string MimeType {get;set;}
-        public string[] parents {get; set;}
+    public class DriveFile
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public string MimeType { get; set; }
+        public string[] parents { get; set; }
     }
     public interface IRsDriveService
     {
         Task<IEnumerable<DriveFile>> Browse(string parent, string tokenId, string tokenKey);
-        Task upload(int fileId, string tokenId, string tokenKey, string name, string parent);
-        Task upload(System.IO.Stream stream, string tokenId, string tokenKey, string name, string parent, long? length = null);
+        Task upload(int fileId, string tokenId, string tokenKey, string parent);
+        Task upload(System.IO.Stream stream, string tokenId, string tokenKey, string name, string parent, long? length = null, string[] pathComponents = null, Action<long> onProgress = null);
     }
 
 
@@ -143,6 +150,9 @@ namespace RedSeatServer.Services
         private readonly IHttpClientFactory _clientFactory;
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly IDownloadersService _downloadersService;
+
+
+        static SemaphoreSlim _folderCheck = new SemaphoreSlim(1, 1);
 
         public RsDriveService(ILogger<RsDriveService> logger, IHttpClientFactory clientFactory, IHttpContextAccessor httpContextAccessor, IDownloadersService downloadersService)
         {
@@ -165,11 +175,10 @@ namespace RedSeatServer.Services
             }
         }
 
-        // If modifying these scopes, delete your previously saved credentials
-        // at ~/.credentials/drive-dotnet-quickstart.json
-        public async Task upload(int file, string tokenId, string tokenKey, string name, string parent)
+        [MaximumConcurrentExecutions(3,timeoutInSeconds: 36000)]
+        public async Task upload(int file, string tokenId, string tokenKey, string parent)
         {
-            
+
             // var client = _clientFactory.CreateClient();
             // var getTask = client.GetAsync(link, HttpCompletionOption.ResponseHeadersRead);
             // HttpResponseMessage response = await getTask.ConfigureAwait(false);
@@ -181,30 +190,86 @@ namespace RedSeatServer.Services
             // var stream = c != null ? await c.ReadAsStreamAsync().ConfigureAwait(false) :
             //     System.IO.Stream.Null;
             var streamResult = await _downloadersService.GetFileStream(file);
-                await upload(streamResult.Stream, tokenId, tokenKey, name, parent, streamResult.Length);
-        }
+            var rfile = await _downloadersService.GetFileById(file);
+            var subPath = new List<string>();
+            if (rfile.Show != null)
+            {
+                subPath.Add(rfile.Show.Name);
+            }
+            if (rfile.Episode != null)
+            {
+                subPath.Add($"Season {rfile.Episode.Season}");
+            }
+            var length = streamResult.Length;
+            Action<long> onProgress = (BytesSent) => {
+                if (length > 0)
+                {
+                    double progressPercent = (double)BytesSent / (double)length * 100;
 
-        public async Task upload(System.IO.Stream streamFile, string tokenId, string tokenKey, string name, string parent, long? length = null)
-        {
-            var tokenHandler = new MessageTokenHandler(tokenId, tokenKey) {driveService = this};
-            var client = new HttpClient(tokenHandler);
-            var driveFile = new DriveFile() { Name = name, MimeType = "video/x-matroska", parents = new string[]{parent} };
-            var response = await client.PostAsJsonAsync("https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable", driveFile, jsonOptions);
-            var location = response.Headers.GetValues("Location").FirstOrDefault();
-            var resumableUpload = ResumableUpload.CreateFromUploadUri(new Uri(location), streamFile);
-            
-            resumableUpload.ProgressChanged += (Google.Apis.Upload.IUploadProgress obj) => { 
-                if (length != null && length.Value > 0) {
-                double progressPercent = (double)obj.BytesSent / (double)length.Value * 100;
-                
-                _logger.LogInformation($"Uploaded file {Math.Round(progressPercent, 2)}% {obj.BytesSent.HumanReadableFileSize()} / {length.Value.HumanReadableFileSize()}");
-                } else {
-                    _logger.LogInformation($"Uploaded {obj.BytesSent.HumanReadableFileSize()} bytes");
+                    _logger.LogInformation($"Uploaded ${rfile.ToString()} {Math.Round(progressPercent, 2)}% {BytesSent.HumanReadableFileSize()} / {length.HumanReadableFileSize()}");
+                }
+                else
+                {
+                    _logger.LogInformation($"Uploaded {BytesSent.HumanReadableFileSize()} bytes");
                 }
             };
 
+            await upload(streamResult.Stream, tokenId, tokenKey, rfile.Name, parent, streamResult.Length, subPath.ToArray(), onProgress: onProgress);
+        }
+
+        public async Task upload(System.IO.Stream streamFile, string tokenId, string tokenKey, string name, string parent, long? length = null, string[] pathComponents = null, Action<long> onProgress = null)
+        {
+            var tokenHandler = new MessageTokenHandler(tokenId, tokenKey) { driveService = this };
+            var client = new HttpClient(tokenHandler);
+
+            // create path components
+            if (pathComponents != null && pathComponents.Length > 0)
+            {
+                foreach (var cp in pathComponents)
+                {
+                    parent = await getOrCreateFolder(parent, cp, tokenId, tokenKey);
+                }
+            }
+
+            var driveFile = new DriveFile() { Name = name, MimeType = "video/x-matroska", parents = new string[] { parent } };
+            var response = await client.PostAsJsonAsync("https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable", driveFile, jsonOptions);
+            var location = response.Headers.GetValues("Location").FirstOrDefault();
+            var resumableUpload = ResumableUpload.CreateFromUploadUri(new Uri(location), streamFile);
+            if(onProgress != null) {
+            resumableUpload.ProgressChanged += (Google.Apis.Upload.IUploadProgress obj) =>
+            onProgress(obj.BytesSent);
+            }
+
             await resumableUpload.UploadAsync();
-            
+
+
+        }
+
+        public async Task<string> getOrCreateFolder(string parent, string name, string tokenId, string tokenKey)
+        {
+            await _folderCheck.WaitAsync();
+            try
+            {
+                var builder = new UriBuilder("https://www.googleapis.com/drive/v3/files");
+                builder.Port = -1;
+                var query = HttpUtility.ParseQueryString(builder.Query);
+                query["q"] = $"mimeType = 'application/vnd.google-apps.folder' and '{parent}' in parents and name = '{name.Replace("'", "\\'")}'";
+                query["pageSize"] = "1000";
+                builder.Query = query.ToString();
+                var tokenHandler = new MessageTokenHandler(tokenId, tokenKey) { driveService = this };
+                var client = new HttpClient(tokenHandler);
+                var response = await client.GetFromJsonAsync<DriveFileResult>(builder.Uri, jsonOptions);
+                if (response.Files.Length > 0) return response.Files[0].Id;
+                var driveFile = new DriveFile() { Name = name, MimeType = "application/vnd.google-apps.folder", parents = new string[] { parent } };
+                var responseNew = await client.PostAsJsonAsync("https://www.googleapis.com/drive/v3/files", driveFile, jsonOptions);
+                var st = await responseNew.Content.ReadFromJsonAsync<DriveFile>(jsonOptions);
+                return st.Id;
+            }
+            finally
+            {
+                _folderCheck.Release();
+            }
+
 
         }
 
@@ -216,14 +281,15 @@ namespace RedSeatServer.Services
             query["q"] = $"mimeType = 'application/vnd.google-apps.folder' and '{parent ?? "root"}' in parents";
             query["pageSize"] = "1000";
             builder.Query = query.ToString();
-            var tokenHandler = new MessageTokenHandler(tokenId, tokenKey) {driveService = this};
+            var tokenHandler = new MessageTokenHandler(tokenId, tokenKey) { driveService = this };
             var client = new HttpClient(tokenHandler);
             var response = await client.GetFromJsonAsync<DriveFileResult>(builder.Uri, jsonOptions);
             return response.Files;
         }
 
 
-        public async Task<IEnumerable<DriveFile>> GetFiles(string parent, string tokenId, string tokenKey, string nextPageToken = null)
+
+        public async Task<IEnumerable<DriveFile>> GetFolders(string parent, string tokenId, string tokenKey, string nextPageToken = null)
         {
             var builder = new UriBuilder("https://www.googleapis.com/drive/v3/files");
             builder.Port = -1;
@@ -232,12 +298,13 @@ namespace RedSeatServer.Services
             query["pageSize"] = "1000";
             query["pageToken"] = nextPageToken;
             builder.Query = query.ToString();
-            var tokenHandler = new MessageTokenHandler(tokenId, tokenKey) {driveService = this};
+            var tokenHandler = new MessageTokenHandler(tokenId, tokenKey) { driveService = this };
             var client = new HttpClient(tokenHandler);
             var response = await client.GetFromJsonAsync<DriveFileResult>(builder.Uri, jsonOptions);
             var files = response.Files;
-            if (response.NextPageToken != null) {
-                var otherFiles = await GetFiles(parent, tokenId, tokenKey, response.NextPageToken);
+            if (response.NextPageToken != null)
+            {
+                var otherFiles = await GetFolders(parent, tokenId, tokenKey, response.NextPageToken);
                 files = files.Union(otherFiles).ToArray();
             }
             return files;

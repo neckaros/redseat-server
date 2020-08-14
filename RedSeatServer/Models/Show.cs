@@ -18,6 +18,7 @@ namespace RedSeatServer.Models
     class ShowMapperProfile : Profile {
         public ShowMapperProfile()
         {
+            CreateMap<ShowLightDto, Show>().ReverseMap();
             CreateMap<TvDbSharper.Dto.Series, Show>()
             .ForMember(dest => dest.Name, opt => opt.MapFrom(src => src.SeriesName))
             .ForMember(dest => dest.TvdbId, opt => opt.MapFrom(src => src.Id))
@@ -102,5 +103,12 @@ namespace RedSeatServer.Models
         [JsonPropertyName("episodes")]
         public List<Episode> Episodes { get; set; } 
 
+    }
+
+    public class ShowLightDto {
+        public int ShowId {get; set;}
+        
+        public string Name { get; set; } 
+        public int TvdbId { get; set; } 
     }
 }

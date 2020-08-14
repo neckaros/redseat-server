@@ -74,7 +74,7 @@ namespace RedSeatServer.Controllers
                 return Unauthorized("No bearer token provided");
             }
 
-            var id = _backgroundJobs.Enqueue<RsDriveService>((d) => d.upload(0, tokenid, key, name, parent));
+            var id = _backgroundJobs.Enqueue<RsDriveService>((d) => d.upload(0, tokenid, key, parent));
 
          
             return Ok(id);

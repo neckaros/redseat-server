@@ -39,6 +39,7 @@ namespace RedSeatServer.Models
         [JsonConverter(typeof(JsonStringEnumConverter))]
         public DownloadStatus DownloadStatus { get; set; }
         public long Size { get; set; }
+        public bool FilesAvailable { get; set; }
         public long Downloaded { get; set; }
         public List<RFile> Files { get; set; }
     }

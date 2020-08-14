@@ -84,9 +84,11 @@ namespace RedSeatServer.Controllers
                 {
                     var downloadSaved = await _downloadersService.AddDownload(downlaod);
                     downloads.Add(downloadSaved);
-                    foreach (var fileAdded in downloadSaved.Files)
-                    {
-                        _backgroundJobs.Enqueue<MonitorProgressService>((s) => s.ParseFile(fileAdded.fileId, true));
+                    if (downloadSaved.Files != null) {
+                        foreach (var fileAdded in downloadSaved.Files)
+                        {
+                            _backgroundJobs.Enqueue<MonitorProgressService>((s) => s.ParseFile(fileAdded.fileId, true));
+                        }
                     }
                     
                 }

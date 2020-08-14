@@ -14,6 +14,7 @@ namespace RedSeatServer.Services
     {
         
         Task<List<Download>> GetAllDownloads();
+        Task<List<Download>> GetUnfiledFownloads();
         Task<List<RFile>> GetUnparsedFiles();
         Task<RFile> GetFile(int id);
       
@@ -37,7 +38,8 @@ namespace RedSeatServer.Services
 
         public Task<List<Download>> GetAllDownloads() => _dbContext.Downloads.AsQueryable().ToListAsync();
         public Task<List<RFile>> GetUnparsedFiles() => _dbContext.Files.AsQueryable().Where(f => !f.Parsed).ToListAsync();
-        public Task<RFile> GetFile(int id) => _dbContext.Files.Include(nameof(RFile.Download)).SingleAsync(f => f.fileId == id);
+        public Task<List<Download>> GetUnfiledFownloads() => _dbContext.Downloads.AsQueryable().Where(f => !f.FilesAvailable).ToListAsync();
+        public Task<RFile> GetFile(int id) => _dbContext.Files.Include(nameof(RFile.Download)).SingleOrDefaultAsync(f => f.fileId == id);
 
     }
 
